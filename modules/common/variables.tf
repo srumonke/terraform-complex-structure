@@ -1,7 +1,7 @@
 variable "environment" {
   description = "Environment name (sandbox, prod)"
   type        = string
-  default     = "sandbox"
+  default     = "prod"
 
   validation {
     condition     = contains(["sandbox", "prod"], var.environment)
