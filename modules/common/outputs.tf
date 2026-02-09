@@ -6,7 +6,7 @@ locals {
 }
 
 output "common_tags" {
-  description = "Common tags to apply to all resources"
+  description = "Common tags to apply to all resources test"
   value = {
     managed_by  = "terraform"
     environment = var.environment
