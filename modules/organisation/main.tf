@@ -5,7 +5,7 @@ resource "random_uuid" "org_id" {
 }
 
 resource "random_integer" "org_number" {
-  min = 1002
+  min = 1003
   max = 9999
 
   keepers = {
