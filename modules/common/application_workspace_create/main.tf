@@ -1,5 +1,9 @@
+data "http" "workspace_yaml" {
+  url = "${var.workspace_repo_raw_url}/${var.workspace_repo_branch}/workspace.yaml"
+}
+
 locals {
-  workspace_data = yamldecode(file(var.workspace_yaml_path))
+  workspace_data = yamldecode(data.http.workspace_yaml.response_body)
   workspaces     = local.workspace_data.workspaces
 }
 
