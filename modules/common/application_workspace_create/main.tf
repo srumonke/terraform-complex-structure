@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    harness = {
+      source = "harness/harness"
+    }
+  }
+}
+
 data "http" "workspace_yaml" {
   url = "${var.workspace_repo_raw_url}/${var.workspace_repo_branch}/workspace.yaml"
 }
