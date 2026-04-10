@@ -13,13 +13,13 @@ variable "workspace_repo_branch" {
 variable "org_id" {
   description = "Harness organization identifier"
   type        = string
-  default     = "default"
+  default     = "TwilioCentraOrg"
 }
 
 variable "project_id" {
   description = "Harness project identifier"
   type        = string
-  default     = "Twilio"
+  default     = "Twilioinfra"
 }
 
 variable "github_connector_id" {
