@@ -6,13 +6,29 @@ terraform {
   }
 }
 
-data "http" "workspace_yaml" {
-  url = "${var.workspace_repo_raw_url}/${var.workspace_repo_branch}/workspace.yaml"
+# Step 1: Fetch the manifest that lists all workspace files
+data "http" "manifest" {
+  url = "${var.workspace_repo_raw_url}/${var.workspace_repo_branch}/workspaces/manifest.yaml"
 }
 
 locals {
-  workspace_data = yamldecode(data.http.workspace_yaml.response_body)
-  workspaces     = local.workspace_data.workspaces
+  manifest_data  = yamldecode(data.http.manifest.response_body)
+  workspace_files = local.manifest_data.files
+}
+
+# Step 2: Fetch each workspace file listed in the manifest
+data "http" "workspace_files" {
+  for_each = toset(local.workspace_files)
+  url      = "${var.workspace_repo_raw_url}/${var.workspace_repo_branch}/workspaces/${each.value}"
+}
+
+# Step 3: Decode each file and merge all workspace maps
+locals {
+  all_workspaces = merge([
+    for file_key, file_data in data.http.workspace_files :
+    yamldecode(file_data.response_body).workspaces
+  ]...)
+  workspaces = local.all_workspaces
 }
 
 resource "harness_platform_workspace" "this" {

@@ -5,7 +5,7 @@ variable "workspace_repo_raw_url" {
 }
 
 variable "workspace_repo_branch" {
-  description = "Branch to fetch workspace.yaml from"
+  description = "Branch to fetch workspace files from"
   type        = string
   default     = "main"
 }
