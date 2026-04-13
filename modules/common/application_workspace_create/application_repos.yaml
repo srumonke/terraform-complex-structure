@@ -1,0 +1,7 @@
+repos:
+  create_iacm_workspace:
+    raw_url: https://raw.githubusercontent.com/srumonke/create_iacm_workspace
+    branch: main
+    org_id: default
+    project_id: Twilio
+    github_connector_id: twilio_connector

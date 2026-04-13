@@ -6,45 +6,67 @@ terraform {
   }
 }
 
-# Step 1: Fetch the manifest that lists all workspace files
-data "http" "manifest" {
-  url = "${var.workspace_repo_raw_url}/${var.workspace_repo_branch}/workspaces/manifest.yaml"
-}
-
+# Load the application repos registry
 locals {
-  manifest_data  = yamldecode(data.http.manifest.response_body)
-  workspace_files = local.manifest_data.files
+  app_repos = yamldecode(file("${path.module}/application_repos.yaml")).repos
 }
 
-# Step 2: Fetch each workspace file listed in the manifest
+# Step 1: Fetch the manifest from each registered repo
+data "http" "manifests" {
+  for_each = local.app_repos
+  url      = "${each.value.raw_url}/${each.value.branch}/workspaces/manifest.yaml"
+}
+
+# Step 2: Build a flat map of all workspace files across all repos
+locals {
+  workspace_file_map = merge([
+    for repo_key, repo in local.app_repos : {
+      for filename in yamldecode(data.http.manifests[repo_key].response_body).files :
+      "${repo_key}/${filename}" => {
+        url                 = "${repo.raw_url}/${repo.branch}/workspaces/${filename}"
+        repo_key            = repo_key
+        org_id              = repo.org_id
+        project_id          = repo.project_id
+        github_connector_id = repo.github_connector_id
+      }
+    }
+  ]...)
+}
+
+# Step 3: Fetch all workspace files across all repos
 data "http" "workspace_files" {
-  for_each = toset(local.workspace_files)
-  url      = "${var.workspace_repo_raw_url}/${var.workspace_repo_branch}/workspaces/${each.value}"
+  for_each = local.workspace_file_map
+  url      = each.value.url
 }
 
-# Step 3: Decode each file and merge all workspace maps
+# Step 4: Decode all files and merge workspaces, attaching repo metadata
 locals {
   all_workspaces = merge([
-    for file_key, file_data in data.http.workspace_files :
-    yamldecode(file_data.response_body).workspaces
+    for file_key, file_meta in local.workspace_file_map : {
+      for ws_key, ws in yamldecode(data.http.workspace_files[file_key].response_body).workspaces :
+      "${file_meta.repo_key}/${ws_key}" => merge(ws, {
+        org_id              = file_meta.org_id
+        project_id          = file_meta.project_id
+        github_connector_id = file_meta.github_connector_id
+      })
+    }
   ]...)
-  workspaces = local.all_workspaces
 }
 
 resource "harness_platform_workspace" "this" {
-  for_each = local.workspaces
+  for_each = local.all_workspaces
 
   name                    = each.value.name
   identifier              = each.value.identifier
-  org_id                  = var.org_id
-  project_id              = var.project_id
+  org_id                  = each.value.org_id
+  project_id              = each.value.project_id
   provisioner_type        = each.value.provisioner_type
   provisioner_version     = each.value.provisioner_version
   repository              = each.value.repository
   repository_branch       = each.value.repository_branch
   repository_path         = each.value.repository_path
-  repository_connector    = var.github_connector_id
-  provider_connector      = var.github_connector_id
+  repository_connector    = each.value.github_connector_id
+  provider_connector      = each.value.github_connector_id
   cost_estimation_enabled = each.value.cost_estimation_enabled
 
   dynamic "terraform_variable" {
