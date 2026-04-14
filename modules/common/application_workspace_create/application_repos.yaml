@@ -5,3 +5,9 @@ repos:
     org_id: default
     project_id: Twilio
     github_connector_id: twilio_connector
+  app2_repo:
+    repo: app2_repo
+    branch: main
+    org_id: default
+    project_id: Twilioapp2
+    github_connector_id: twilio_connector
