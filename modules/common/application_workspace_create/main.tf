@@ -14,7 +14,7 @@ locals {
 # Step 1: List files in the workspaces/ folder via GitHub API
 data "http" "workspace_dirs" {
   for_each = local.app_repos
-  url      = "https://api.github.com/repos/${each.value.repo}/contents/workspaces?ref=${each.value.branch}"
+  url      = "https://api.github.com/repos/srumonke/${each.value.repo}/contents/workspaces?ref=${each.value.branch}"
 
   request_headers = {
     Accept = "application/vnd.github.v3+json"
@@ -124,7 +124,7 @@ resource "harness_platform_triggers" "workspace_push" {
                   operator: Equals
                   value: ${each.value.branch}
               headerConditions: []
-              repoName: ${split("/", each.value.repo)[1]}
+              repoName: ${each.value.repo}
               actions: []
   EOT
 }
