@@ -30,11 +30,10 @@ locals {
         entry if endswith(entry.name, ".yaml") || endswith(entry.name, ".yml")
       ] :
       "${repo_key}/${file_entry.name}" => {
-        url                 = file_entry.download_url
-        repo_key            = repo_key
-        org_id              = repo.org_id
-        project_id          = repo.project_id
-        github_connector_id = repo.github_connector_id
+        url        = file_entry.download_url
+        repo_key   = repo_key
+        org_id     = repo.org_id
+        project_id = repo.project_id
       }
     }
   ]...)
@@ -52,9 +51,8 @@ locals {
     for file_key, file_meta in local.workspace_file_map : {
       for ws_key, ws in yamldecode(data.http.workspace_files[file_key].response_body).workspaces :
       "${file_meta.repo_key}/${ws_key}" => merge(ws, {
-        org_id              = file_meta.org_id
-        project_id          = file_meta.project_id
-        github_connector_id = file_meta.github_connector_id
+        org_id     = file_meta.org_id
+        project_id = file_meta.project_id
       })
     }
   ]...)
@@ -117,7 +115,7 @@ resource "harness_platform_triggers" "workspace_push" {
           spec:
             type: Push
             spec:
-              connectorRef: ${each.value.github_connector_id}
+              connectorRef: twilio_connector
               autoAbortPreviousExecutions: true
               payloadConditions:
                 - key: targetBranch
@@ -141,8 +139,8 @@ resource "harness_platform_workspace" "this" {
   repository              = each.value.repository
   repository_branch       = each.value.repository_branch
   repository_path         = each.value.repository_path
-  repository_connector    = each.value.github_connector_id
-  provider_connector      = each.value.github_connector_id
+  repository_connector    = each.value.repository_connector
+  provider_connector      = each.value.repository_connector
   cost_estimation_enabled = each.value.cost_estimation_enabled
 
   dynamic "terraform_variable" {
