@@ -11,19 +11,26 @@ locals {
   app_repos = yamldecode(file("${path.module}/application_repos.yaml")).repos
 }
 
-# Step 1: Fetch the manifest from each registered repo
-data "http" "manifests" {
+# Step 1: List files in the workspaces/ folder via GitHub API
+data "http" "workspace_dirs" {
   for_each = local.app_repos
-  url      = "${each.value.raw_url}/${each.value.branch}/workspaces/manifest.yaml"
+  url      = "https://api.github.com/repos/${each.value.repo}/contents/workspaces?ref=${each.value.branch}"
+
+  request_headers = {
+    Accept = "application/vnd.github.v3+json"
+  }
 }
 
-# Step 2: Build a flat map of all workspace files across all repos
+# Step 2: Build a flat map of all workspace YAML files across all repos
 locals {
   workspace_file_map = merge([
     for repo_key, repo in local.app_repos : {
-      for filename in yamldecode(data.http.manifests[repo_key].response_body).files :
-      "${repo_key}/${filename}" => {
-        url                 = "${repo.raw_url}/${repo.branch}/workspaces/${filename}"
+      for file_entry in [
+        for entry in jsondecode(data.http.workspace_dirs[repo_key].response_body) :
+        entry if endswith(entry.name, ".yaml") || endswith(entry.name, ".yml")
+      ] :
+      "${repo_key}/${file_entry.name}" => {
+        url                 = file_entry.download_url
         repo_key            = repo_key
         org_id              = repo.org_id
         project_id          = repo.project_id
