@@ -4,3 +4,8 @@ repos:
     branch: main
     org_id: default
     project_id: Twilio
+  app2_repo:
+    repo: app2_repo
+    branch: main
+    org_id: default
+    project_id: Twilioapp2
