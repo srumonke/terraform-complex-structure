@@ -60,6 +60,41 @@ locals {
   ]...)
 }
 
+# Auto-register a webhook trigger for each application repo
+resource "harness_platform_trigger" "workspace_push" {
+  for_each   = local.app_repos
+  identifier = "${each.key}_push_trigger"
+  name       = "${each.key}-push-trigger"
+  org_id     = "TwilioCentraOrg"
+  project_id = "Twilioinfra"
+  target_id  = "iacm_workspace_provision_iacm"
+  yaml       = <<-EOT
+    trigger:
+      name: ${each.key}-push-trigger
+      identifier: ${each.key}_push_trigger
+      enabled: true
+      orgIdentifier: TwilioCentraOrg
+      projectIdentifier: Twilioinfra
+      pipelineIdentifier: iacm_workspace_provision_iacm
+      source:
+        type: Webhook
+        spec:
+          type: Github
+          spec:
+            type: Push
+            spec:
+              connectorRef: ${each.value.github_connector_id}
+              autoAbortPreviousExecutions: true
+              payloadConditions:
+                - key: targetBranch
+                  operator: Equals
+                  value: ${each.value.branch}
+              headerConditions: []
+              repoName: ${split("/", each.value.repo)[1]}
+              actions: []
+  EOT
+}
+
 resource "harness_platform_workspace" "this" {
   for_each = local.all_workspaces
 
