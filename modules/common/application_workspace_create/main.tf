@@ -60,6 +60,40 @@ locals {
   ]...)
 }
 
+# Trigger for the terraform repo itself — fires when application_repos.yaml changes
+resource "harness_platform_trigger" "terraform_repo_push" {
+  identifier = "terraform_repo_push_trigger"
+  name       = "terraform-repo-push-trigger"
+  org_id     = "TwilioCentraOrg"
+  project_id = "Twilioinfra"
+  target_id  = "iacm_workspace_provision_iacm"
+  yaml       = <<-EOT
+    trigger:
+      name: terraform-repo-push-trigger
+      identifier: terraform_repo_push_trigger
+      enabled: true
+      orgIdentifier: TwilioCentraOrg
+      projectIdentifier: Twilioinfra
+      pipelineIdentifier: iacm_workspace_provision_iacm
+      source:
+        type: Webhook
+        spec:
+          type: Github
+          spec:
+            type: Push
+            spec:
+              connectorRef: twilio_connector
+              autoAbortPreviousExecutions: true
+              payloadConditions:
+                - key: targetBranch
+                  operator: Equals
+                  value: main
+              headerConditions: []
+              repoName: terraform-complex-structure
+              actions: []
+  EOT
+}
+
 # Auto-register a webhook trigger for each application repo
 resource "harness_platform_trigger" "workspace_push" {
   for_each   = local.app_repos
