@@ -1,6 +1,112 @@
-# Terraform Complex Structuretest2
+# Terraform Complex Structure
 
-Multi-layer Terraform repository demonstrating modular structure with controller workspaces across multiple environments.
+Multi-layer Terraform repository for managing Harness IaCM workspaces across multiple application repos and environments using a centralized, registry-driven approach.
+
+## Cross-Application Workspace Creation
+
+This repo implements a **cross-application repository workspace creation** pattern. Instead of each application repo managing its own Harness IaCM workspace, this central Terraform repo discovers and provisions workspaces for all registered application repos automatically.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  This Repo (terraform-complex-structure)                    │
+│                                                             │
+│  application_repos.yaml ─── list of app repos to manage    │
+│         │                                                   │
+│         ▼                                                   │
+│  GitHub API ─── fetch workspaces/ folder from each repo    │
+│         │                                                   │
+│         ▼                                                   │
+│  Decode YAML ─── parse workspace definitions                │
+│         │                                                   │
+│         ▼                                                   │
+│  harness_platform_workspace ─── create IaCM workspaces     │
+│  harness_platform_triggers  ─── create webhook triggers    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+1. **Registry file** (`modules/common/application_workspace_create/application_repos.yaml`) lists all application repos, their branches, and the Harness org/project they belong to:
+
+    ```yaml
+    repos:
+      create_iacm_workspace:
+        repo: create_iacm_workspace
+        branch: main
+        org_id: default
+        project_id: Twilio
+      app2_repo:
+        repo: app2_repo
+        branch: main
+        org_id: default
+        project_id: Twilioapp2
+    ```
+
+2. **Workspace discovery** — The module uses the GitHub API to list all `.yaml`/`.yml` files in each application repo's `workspaces/` directory. Each file defines one or more Harness IaCM workspaces with their provisioner settings, repository paths, connectors, and Terraform variables.
+
+3. **Workspace provisioning** — For every discovered workspace definition, the module creates a `harness_platform_workspace` resource with the workspace's config (provisioner type/version, repository details, connector references, cost estimation, and Terraform variables).
+
+4. **Webhook triggers** — The module automatically creates GitHub push triggers for:
+   - **Each application repo** — so workspace definitions are re-applied whenever the app repo is updated
+   - **This Terraform repo itself** — so adding a new repo to the registry triggers a re-run
+
+### Adding a New Application Repo
+
+To onboard a new application repo:
+
+1. Add an entry to `modules/common/application_workspace_create/application_repos.yaml`:
+    ```yaml
+    repos:
+      my_new_app:
+        repo: my-new-app-repo    # GitHub repo name
+        branch: main             # Branch to read workspace defs from
+        org_id: default          # Harness org
+        project_id: MyProject    # Harness project
+    ```
+
+2. In the application repo, create a `workspaces/` directory with YAML files defining the workspaces. Each YAML file should follow this structure:
+    ```yaml
+    workspaces:
+      my_workspace:
+        name: my-workspace
+        identifier: my_workspace
+        provisioner_type: terraform
+        provisioner_version: 1.5.0
+        repository: my-new-app-repo
+        repository_branch: main
+        repository_path: infra/
+        repository_connector: twilio_connector
+        cost_estimation_enabled: true
+        terraform_variables:
+          region:
+            value: us-east-1
+            value_type: string
+    ```
+
+3. Push to this repo — the webhook trigger will run the Harness IaCM pipeline to provision the new workspaces.
+
+### Pipeline and Bootstrap
+
+The entire flow is executed by the **`iacm_workspace_provision_iacm`** pipeline in Harness (org: `TwilioCentraOrg`, project: `Twilioinfra`). The pipeline runs an IaCM stage (`init` → `plan` → `apply`) against the **`bootstrapworkspace3`** workspace, which points to `modules/common/application_workspace_create` in this repo.
+
+Harness provider credentials (`HARNESS_ENDPOINT`, `HARNESS_ACCOUNT_ID`, `HARNESS_PLATFORM_API_KEY`) are set as environment variables on the bootstrap workspace.
+
+### Trigger Architecture
+
+All triggers target the `iacm_workspace_provision_iacm` pipeline in the `TwilioCentraOrg/Twilioinfra` project:
+
+- **`terraform_repo_push_trigger`** — fires on push to `main` of this repo (registry changes)
+- **`{repo_key}_push_trigger`** — fires on push to each application repo's configured branch (workspace definition changes)
+
+These triggers are managed by Terraform and should not be deleted manually from the Harness UI (Terraform will recreate them on next apply).
+
+### Idempotency Across Repos
+
+Every pipeline run reconciles **all** registered repos, not just the one that triggered it. This is safe because Terraform is idempotent — unchanged repos produce no diff and are skipped. For example, if team1 pushes a workspace change, team2 and team3's workspaces are evaluated but nothing changes for them. The only cost is slightly longer plan times as more repos are added (more GitHub API calls).
+
+### Workspace Key Namespacing
+
+Workspace keys in Terraform state are namespaced as `repo_key/workspace_key` to avoid collisions across repos. Within a single application repo, workspace keys must be unique across all YAML files (they are merged into a single map).
 
 ## Structure
 
@@ -11,6 +117,7 @@ Reusable Terraform modules used by all environments:
 - `modules/common/` - Environment-aware shared configuration
   - Provides environment-specific naming prefixes (tf_sandbox, tf_prod)
   - Common tags with environment label
+- `modules/common/application_workspace_create/` - Cross-application workspace provisioning (see above)
 - `modules/organisation/` - Organisation resource module
 - `modules/project/` - Project resource module
 - `modules/registry_provider/` - Provider registry module
@@ -139,4 +246,3 @@ All modules use the random provider as placeholder for testing directory structu
 
 - `docs/structure.md` - Original structure diagram
 - `docs/plans/` - Implementation plans
-# terraform-complex-structure
