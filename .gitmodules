@@ -1,0 +1,3 @@
+[submodule "shared"]
+	path = vendor/shared
+	url = https://github.com/srumonke/terraform-complex-structure.git
